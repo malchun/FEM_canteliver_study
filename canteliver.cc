@@ -237,7 +237,7 @@ BodyForce<dim>::BodyForce()
     : Function<dim>(dim) {}
 
 template <int dim>
-inline void BodyForce<dim>::vector_value(const Point<dim> & /*p*/,
+inline void BodyForce<dim>::vector_value(const Point<dim> & p,
                                          Vector<double> &values) const {
   Assert(values.size() == dim, ExcDimensionMismatch(values.size(), dim));
 
@@ -248,6 +248,13 @@ inline void BodyForce<dim>::vector_value(const Point<dim> & /*p*/,
   values = 0;
   // Немного тяжести по z 
   values(dim - 1) = -rho * g;
+  // И по y тоже, но побольше.
+  if ((9.8 < p[2]) &&
+      (10.2 > p[2]) &&
+      (-0.2 < p[0]) &&
+      (0.2 > p[0])) {
+    values(1) = rho * g * 200;
+  }
 }
 
 template <int dim>
@@ -511,6 +518,7 @@ void TopLevel<dim>::assemble_system() {
       dof_handler, 0, ZeroFunction<dim>(dim), boundary_values);
   VectorTools::interpolate_boundary_values(
       dof_handler, 1, ZeroFunction<dim>(dim), boundary_values);
+/*  
   // Нагрузка. По желанию, можно явно указать маску.
   // Upd - нифига это не силы. Это заданное движение границы. 
   // Поэтому и не останавливается. Как только смогу - переделаю.
@@ -519,7 +527,7 @@ void TopLevel<dim>::assemble_system() {
       IncrementalBoundaryValues<dim>(present_time, present_timestep),
       boundary_values);
   //                                 fe.component_mask(y_component));
-
+*/
   PETScWrappers::MPI::Vector tmp(mpi_communicator, dof_handler.n_dofs(),
                                  n_local_dofs);
   MatrixTools::apply_boundary_values(boundary_values, system_matrix, tmp,
