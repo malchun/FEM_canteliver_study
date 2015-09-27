@@ -44,6 +44,9 @@
 #include <sstream>
 #include <iomanip>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 using namespace dealii;
 
 template <int dim>
@@ -372,10 +375,16 @@ void TopLevel<dim>::create_coarse_grid() {
       if (cell->face(f)->at_boundary()) {
         const Point<dim> face_center = cell->face(f)->center();
 
-        if (face_center[2] == 0)
+        if (0 == face_center[2])
           cell->face(f)->set_boundary_id(0);
-        else if (face_center[2] == 20)
+        else if (20 == face_center[2])
           cell->face(f)->set_boundary_id(1);
+        else if ((9.8 < face_center[2]) &&
+                 (10.2 > face_center[2]) &&
+                 (-0.2 < face_center[0]) &&
+                 (0.2 > face_center[0]) &&
+                 (-1 == face_center[1]))
+          cell->face(f)->set_boundary_id(4);
         else
           cell->face(f)->set_boundary_id(2);
       }
@@ -492,17 +501,21 @@ void TopLevel<dim>::assemble_system() {
   system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
 
-  // Указание точек воздействия внешних сил. 
+  // Указание областей воздействия сил. 
   // ========================== Values ===============================
   //FEValuesExtractors::Scalar z_component(dim - 1);
   //FEValuesExtractors::Scalar y_component(dim - 2);
   std::map<types::global_dof_index, double> boundary_values;
-  // Неподвижная земля. Совсем неподвижная.
+  // Симулируются концы в "зажимах"
   VectorTools::interpolate_boundary_values(
       dof_handler, 0, ZeroFunction<dim>(dim), boundary_values);
-  // Давление на верхний конец (вбок по y). По желанию, можно явно указать маску.
   VectorTools::interpolate_boundary_values(
-      dof_handler, 1,
+      dof_handler, 1, ZeroFunction<dim>(dim), boundary_values);
+  // Нагрузка. По желанию, можно явно указать маску.
+  // Upd - нифига это не силы. Это заданное движение границы. 
+  // Поэтому и не останавливается. Как только смогу - переделаю.
+  VectorTools::interpolate_boundary_values(
+      dof_handler, 4,
       IncrementalBoundaryValues<dim>(present_time, present_timestep),
       boundary_values);
   //                                 fe.component_mask(y_component));
@@ -588,6 +601,7 @@ class FilteredDataOut : public DataOut<dim> {
 };
 
 // Вывод, который организуется через данный черезвычайно хитрый класс.
+// Пишет в папку result.
 template <int dim>
 void TopLevel<dim>::output_results() const {
   FilteredDataOut<dim> data_out(this_mpi_process);
@@ -640,7 +654,7 @@ void TopLevel<dim>::output_results() const {
 
   data_out.build_patches();
 
-  std::string filename = "solution-" +
+  std::string filename = "result/solution-" +
                          Utilities::int_to_string(timestep_no, 4) + "." +
                          Utilities::int_to_string(this_mpi_process, 3) + ".vtu";
 
@@ -652,7 +666,7 @@ void TopLevel<dim>::output_results() const {
   if (this_mpi_process == 0) {
     std::vector<std::string> filenames;
     for (unsigned int i = 0; i < n_mpi_processes; ++i)
-      filenames.push_back("solution-" +
+      filenames.push_back("result/solution-" +
                           Utilities::int_to_string(timestep_no, 4) + "." +
                           Utilities::int_to_string(i, 3) + ".vtu");
   }
@@ -811,6 +825,12 @@ void TopLevel<dim>::update_quadrature_point_history() {
 
 int main (int argc, char **argv)
 {
+    struct stat sb;
+
+    if (stat("result/", &sb) != 0 || !S_ISDIR(sb.st_mode)) {
+        std::cout << "Can't find directory result/. Aborting." << std::endl;
+        return 0;
+    }
     try {
         Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
         {
