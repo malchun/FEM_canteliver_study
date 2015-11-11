@@ -249,11 +249,11 @@ inline void BodyForce<dim>::vector_value(const Point<dim> & p,
   // Немного тяжести по z 
   values(dim - 1) = -rho * g;
   // И по y тоже, но побольше.
-  if ((9.8 < p[2]) &&
-      (10.2 > p[2]) &&
-      (-0.2 < p[0]) &&
-      (0.2 > p[0])) {
-    values(1) = rho * g * 200;
+  if ((9.5 < p[2]) &&
+      (10.5 > p[2]) &&
+      (-0.4 < p[0]) &&
+      (0.4 > p[0])) {
+    values(1) = rho * g * 50000;
   }
 }
 
@@ -307,11 +307,12 @@ void IncrementalBoundaryValues<dim>::vector_value(
   //================ Values!!!!! ======================
   // Здесь задается вектор внешней силы. Один. 
   // Не могу перевести в нормальные величины.
+  // Upd Это не силы, это просто скорость.
   values = 0;
   // x
   //values(0) = velocity * 1;
   // y
-  values(1) = velocity * 1;
+  //values(1) = velocity * 1;
 }
 
 template <int dim>
@@ -357,7 +358,7 @@ void TopLevel<dim>::run() {
   // ================ YOHOHOHO =================
   present_time = 0;
   present_timestep = 1;
-  end_time = 20;
+  end_time = 10;
   timestep_no = 0;
 
   do_initial_timestep();
